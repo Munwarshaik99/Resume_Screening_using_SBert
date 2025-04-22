@@ -1,4 +1,3 @@
-
 import streamlit as st
 import os
 import pdfplumber
@@ -6,7 +5,9 @@ import docx2txt
 import pandas as pd
 from sentence_transformers import SentenceTransformer, util
 import re
+from io import StringIO
 
+# Load BERT Model
 @st.cache_resource
 def load_bert_model():
     return SentenceTransformer('all-MiniLM-L6-v2')
@@ -16,10 +17,12 @@ model = load_bert_model()
 st.title("🧠 Advanced Resume Screening Tool")
 st.markdown("Upload **Job Description** and **multiple resumes** (PDF, DOCX, CSV), and get dynamic candidate scores and insights.")
 
+# --------- File Upload Section ---------
 jd_file = st.file_uploader("📄 Upload Job Description (PDF/DOCX/CSV)", type=["pdf", "docx", "csv"])
 resume_files = st.file_uploader("📂 Upload Resumes (PDF/DOCX/CSV) — Multiple", type=["pdf", "docx", "csv"], accept_multiple_files=True)
 process_btn = st.button("🚀 Process")
 
+# --------- Text Extraction Utilities ---------
 def extract_text(file):
     if file.name.endswith('.pdf'):
         with pdfplumber.open(file) as pdf:
@@ -31,6 +34,7 @@ def extract_text(file):
         return "\n".join(df.astype(str).apply(lambda x: ' '.join(x), axis=1))
     return ""
 
+# --------- Resume Parsing Utilities ---------
 def extract_years_experience(text):
     patterns = [
         r'(\d{1,2})\+?\s*(years|yrs)[\s\w]{0,15}(experience|exp)',
@@ -62,12 +66,14 @@ def calculate_bert_score(jd_text, resume_text):
     resume_embed = model.encode(resume_text, convert_to_tensor=True)
     return float(util.pytorch_cos_sim(jd_embed, resume_embed)[0][0]) * 100
 
+# --------- Main Processing ---------
 if process_btn and jd_file and resume_files:
     jd_text = extract_text(jd_file)
     results = []
 
     for resume in resume_files:
         resume_text_raw = extract_text(resume)
+
         score = round(calculate_bert_score(jd_text, resume_text_raw), 2)
         skills = extract_primary_skills(resume_text_raw)
         experience = extract_years_experience(resume_text_raw)
